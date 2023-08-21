@@ -27,8 +27,8 @@ PWM_DIV = 250               # 125e6 / 125 = 500 kHz
 PWM_WRAP = 50000 - 1        # 500 kHz / 50000 = 10 Hz
 PWM_LEVEL = (PWM_WRAP+1)//2 # 50% PWM
 
-NTIMES = 9                   # Number of time samples
-time_data = devs.array32(10) # Time data
+NTIMES = 9                       # Number of time samples
+time_data = devs.array32(NTIMES) # Time data
 
 # Start a PWM output
 def pwm_out(pin, div, level, wrap): 
