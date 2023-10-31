@@ -20,6 +20,7 @@
 # v0.03 JPB 19/8/23  Renamed rp_devices.py to pico_devices.py
 # v0.04 JPB 20/8/23  Additions for gated frequency measurement
 # v0.05 JPB 21/8/23  Tidied up for release
+# v0.06 JPB 31/10/23 Corrected PAD_PINS definition (added offset)
 
 from uctypes import BF_POS, BF_LEN, UINT32, BFUINT32, struct
 import array, uctypes
@@ -139,7 +140,7 @@ PAD_REGS = {
     "PAD_REG":             0x00|UINT32,
     "PAD":                (0x00,PAD_FIELDS)
 }
-PAD_PINS =  [struct(PAD_BASE + n*PAD_PIN_WIDTH, PAD_REGS) for n in range(0,GPIO_PIN_COUNT)]
+PAD_PINS =  [struct(PAD_BASE + (n+1)*PAD_PIN_WIDTH, PAD_REGS) for n in range(0,GPIO_PIN_COUNT)]
 
 # ADC: RP2040 datasheet 4.9.6
 ADC_CS_FIELDS = {
