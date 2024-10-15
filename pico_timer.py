@@ -17,15 +17,22 @@
 #
 # v0.01 JPB 20/8/23 Adapted from pico_freq.py
 # v0.02 JPB 21/8/23 Removed unneeded gate definitions
+# v0.03 JPB 15/10/24 Adapted to work with RP2040 and RP2350
 
 import time, pico_devices as devs
 
 PWM_OUT_PIN, PWM_IN_PIN = 4, 3
 
 # Output signal for testing
-PWM_DIV = 250               # 125e6 / 125 = 500 kHz
-PWM_WRAP = 50000 - 1        # 500 kHz / 50000 = 10 Hz
-PWM_LEVEL = (PWM_WRAP+1)//2 # 50% PWM
+# Divisor value must be < 256, and wrap value < 65536
+if devs.PICO2:
+    PWM_DIV = int(devs.CLOCK_FREQ/600e3)  # 600 kHz
+    PWM_WRAP = 60000 - 1                  # 600 kHz / 60000 = 10 Hz
+else:
+    PWM_DIV = int(devs.CLOCK_FREQ/500e3)  # 500 kHz
+    PWM_WRAP = 50000 - 1                  # 500 kHz / 50000 = 10 Hz
+    
+PWM_LEVEL = (PWM_WRAP+1)//2           # 50% PWM
 
 NTIMES = 9                       # Number of time samples
 time_data = devs.array32(NTIMES) # Time data
@@ -61,7 +68,7 @@ def timer_dma_init(timer):
     dma.set_read_addr(devs.TIMER_RAWL_ADDR)
     return dma
 
-# Start frequency measurment using gate
+# Start frequency measurment using interval times
 def timer_start(timer, dma):
     timer.set_ctr(0)
     timer.set_enabled(True)
@@ -69,11 +76,13 @@ def timer_start(timer, dma):
     dma.set_write_addr(devs.addressof(time_data))
     dma.set_trans_count(NTIMES, True)
 
-# Stop frequency measurment using gate
+# Stop frequency measurment using interval times
 def timer_stop(timer):
     timer.set_enabled(False)
     
 if __name__ == "__main__":
+    print("PWM output pin %u, freq input pin %u" % (PWM_OUT_PIN, PWM_IN_PIN))
+    print("Getting transition times on pin %u for 1 second" % PWM_IN_PIN)
     test_signal = pwm_out(PWM_OUT_PIN, PWM_DIV, PWM_LEVEL, PWM_WRAP)
     
     timer_pwm = timer_init(PWM_IN_PIN)
@@ -88,6 +97,6 @@ if __name__ == "__main__":
     diffs = [data[n]-data[n-1] for n in range(1, len(data))]
     total = sum(diffs)
     freq = (1e6 * len(diffs) / total) if total else 0
-    print("%u samples, total %u us, freq %3.1f Hz" % (count, total, freq))
+    print("%u samples, total %u us, freq %5.3f Hz" % (count, total, freq))
     
 # EOF

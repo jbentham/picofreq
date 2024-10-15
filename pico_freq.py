@@ -19,6 +19,7 @@
 #                   Added counter gating for frequency measurment
 # v0.04 JPB 20/8/23 Switched input from pin 7 to pin 3
 # v0.05 JPB 20/8/23 Corrected DMA initialisation
+# v0.06 JPB 15/10/24 Adapted to work with RP2040 and RP2350
 
 import time, pico_devices as devs
 
@@ -26,14 +27,19 @@ PWM_OUT_PIN, PWM_IN_PIN = 4, 3
 GATE_TIMER_PIN          = 0
 
 # Output signal for testing
-PWM_DIV = 125               # 125e6 / 125 = 1 MHz
-PWM_WRAP = 9                # 1 MHz / (9 + 1) = 100 kHz
-PWM_LEVEL = (PWM_WRAP+1)//2 # 50% PWM
-
-# Frequency gate settings
-GATE_PRESCALE = 250         # 125e6 / 250 = 500 kHz
-GATE_WRAP = 125000          # 500 kHz / 125000 = 4 Hz (250 ms)
-GATE_FREQ = 125e6 / (GATE_PRESCALE * GATE_WRAP)
+PWM_DIV = int(devs.CLOCK_FREQ/1e6)  # 1 MHz
+PWM_WRAP = 9                        # 1 MHz / (9 + 1) = 100 kHz
+PWM_LEVEL = (PWM_WRAP+1)//2         # 50% PWM
+    
+# Frequency gate settings for RP2350 and RP2040
+# Prescale must be < 256, and wrap < 131072 (phase correct mode)
+if devs.PICO2:
+    GATE_PRESCALE = 250     # 150e6 / 250 = 600 kHz
+    GATE_WRAP = 120000      # 600 kHz / 120000 = 5 Hz (200 ms)
+else:
+    GATE_PRESCALE = 250     # 125e6 / 250 = 500 kHz
+    GATE_WRAP = 125000      # 500 kHz / 125000 = 4 Hz (250 ms)
+GATE_FREQ = devs.CLOCK_FREQ / (GATE_PRESCALE * GATE_WRAP)
 GATE_TIME_MSEC = 1000 / GATE_FREQ
 
 gate_data = devs.array32(1) # Gate DMA data
@@ -51,7 +57,7 @@ def pwm_out(pin, div, level, wrap):
 # Initialise PWM as a pulse counter (gpio must be odd number)
 def pulse_counter_init(pin, rising=True):
     if pin & 1 == 0:
-        print("Error: pulse counter must be on add GPIO pin")
+        print("Error: pulse counter must be odd GPIO pin")
     devs.gpio_set_function(pin, devs.GPIO_FUNC_PWM)
     ctr = devs.PWM(pin)
     ctr.set_clkdiv_mode(devs.PWM_DIV_B_RISING if rising else devs.PWM_DIV_B_FALLING)
@@ -83,19 +89,24 @@ def gate_dma_init(ctr, gate):
     dma.set_write_addr(ctr.get_csr_address())
     return dma
 
-# Start frequency measurment using gate
+# Start frequency measurement using gate
 def freq_gate_start(ctr, gate, dma):
     ctr.set_ctr(0)
     gate.set_ctr(0)
     dma.set_trans_count(1, True)
     ctr.set_enables((1<<ctr.slice_num) | (1<<gate.slice_num), True)
 
-# Stop frequency measurment using gate
+# Check if frequency measurment is complete (DMA triggered)
+def dma_complete(dma):
+    return dma.get_trans_count() == 0
+
+# Stop frequency measurement using gate
 def freq_gate_stop(ctr, gate, dma):
     gate_pwm.set_enabled(False)
     dma.abort()
     
 if __name__ == "__main__":
+    print("PWM output pin %u, freq input pin %u" % (PWM_OUT_PIN, PWM_IN_PIN))
     test_signal = pwm_out(PWM_OUT_PIN, PWM_DIV, PWM_LEVEL, PWM_WRAP)
     
     counter_pwm = pulse_counter_init(PWM_IN_PIN)
@@ -104,9 +115,10 @@ if __name__ == "__main__":
     
     freq_gate_start(counter_pwm, gate_pwm, gate_dma)
     time.sleep(0.3)
+    if not dma_complete(gate_dma):
+        print("Gate DMA failed")
     count = pulse_counter_value(counter_pwm)
     freq_gate_stop(counter_pwm, gate_pwm, gate_dma)
     freq = count / GATE_TIME_MSEC
     print("Gate %3.1f ms, count %u, freq %3.1f kHz" % (GATE_TIME_MSEC, count, freq))
-    
 # EOF

@@ -20,14 +20,15 @@
 #                   Clear PWM counter before running as timer
 # v0.03 JPB 19/8/23 Renamed rp_pwm_counter.py to pico_counter.py
 # v0.04 JPB 20/8/23 Switched input from pin 7 to pin 3
+# v0.05 JPB 15/10/24 Adapted to work with RP2040 and RP2350
 
 import time, pico_devices as devs
 
 PWM_OUT_PIN, PWM_IN_PIN = 4, 3
 
-PWM_DIV = 125               # 125e6 / 125 = 1 MHz
-PWM_WRAP = 9                # 1 MHz / (9 + 1) = 100 kHz
-PWM_LEVEL = (PWM_WRAP+1)//2 # 50% PWM
+PWM_DIV = int(devs.CLOCK_FREQ/1e6)  # 1 MHz
+PWM_WRAP = 9                        # 1 MHz / (9 + 1) = 100 kHz
+PWM_LEVEL = (PWM_WRAP+1)//2         # 50% PWM
 
 ext_data = devs.array32(1)  # Dummy array for extended counter
 
@@ -44,7 +45,7 @@ def pwm_out(pin, div, level, wrap):
 # Initialise PWM as a pulse counter (gpio must be odd number)
 def pulse_counter_init(pin, rising=True):
     if pin & 1 == 0:
-        print("Error: pulse counter must be on add GPIO pin")
+        print("Error: pulse counter must be odd GPIO pin")
     devs.gpio_set_function(pin, devs.GPIO_FUNC_PWM)
     pwm = devs.PWM(pin)
     pwm.set_clkdiv_mode(devs.PWM_DIV_B_RISING if rising else devs.PWM_DIV_B_FALLING)
@@ -79,7 +80,7 @@ def pulse_counter_ext_init(ctr):
 # Start the extended pulse counter
 def pulse_counter_ext_start(ctr_dma):
     ctr_dma.abort()
-    ctr_dma.set_trans_count(0xffffffff, True)
+    ctr_dma.set_trans_count(0xfffffff, True)
  
 # Stop the extended pulse counter
 def pulse_counter_ext_stop(ctr_dma):
@@ -87,7 +88,7 @@ def pulse_counter_ext_stop(ctr_dma):
  
 # Return value from extended pulse counter
 def pulse_counter_ext_value(ctr_dma):
-    return 0xffffffff - ctr_dma.get_trans_count()
+    return 0xfffffff - ctr_dma.get_trans_count()
 
 if __name__ == "__main__":
     test_signal = pwm_out(PWM_OUT_PIN, PWM_DIV, PWM_LEVEL, PWM_WRAP)

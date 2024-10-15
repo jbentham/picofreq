@@ -1,7 +1,7 @@
-# RP2040 uctype definitions for MicroPython
+# RP2350 uctype definitions for MicroPython
 # See https://iosoft.blog/picofreq_python for description
 #
-# Copyright (c) 2023 Jeremy P Bentham
+# Copyright (c) 2024 Jeremy P Bentham
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,32 +21,69 @@
 # v0.04 JPB 20/8/23  Additions for gated frequency measurement
 # v0.05 JPB 21/8/23  Tidied up for release
 # v0.06 JPB 31/10/23 Corrected PAD_PINS definition (added offset)
+# v0.07 JPB 14/10/24 Added Pico 2 (RP2350) definitions
 
 from uctypes import BF_POS, BF_LEN, UINT32, BFUINT32, struct
-import array, uctypes
+import array, uctypes, uos
 
-PAD_BASE        = 0x4001c000
-PAD_PIN_WIDTH   = 0x04
-ADC_BASE        = 0x4004c000
-PWM_BASE        = 0x40050000
-PWM_SLICE_WIDTH = 0x14
-PWM_SLICE_COUNT = 8
-TIMER_BASE      = 0x40054000
+PICO2 = "2350" in uos.uname().machine
+if PICO2:
+    CLOCK_FREQ      = 150e6
+    GPIO_BASE       = 0x40028000
+    PAD_BASE        = 0x40038000
+    ADC_BASE        = 0x400a0000
+    PWM_BASE        = 0x400a8000
+    TIMER_BASE      = 0x400b0000
+    DMA_BASE        = 0x50000000
+else:
+    CLOCK_FREQ      = 125e6
+    GPIO_BASE       = 0x40014000
+    PAD_BASE        = 0x4001c000
+    ADC_BASE        = 0x4004c000
+    PWM_BASE        = 0x40050000
+    TIMER_BASE      = 0x40054000
+    DMA_BASE        = 0x50000000
 
-# DMA: RP2040 datasheet 2.5.7
-DMA_BASE        = 0x50000000
+# DMA: datasheet RP2040 2.5.7, RP2350 12.6.10
 DMA_CHAN_WIDTH  = 0x40
-DMA_CHAN_COUNT  = 12
+DMA_CHAN_COUNT  = 16
 DMA_SIZE_8, DMA_SIZE_16, DMA_SIZE_32 = 0, 1, 2
-DREQ_PIO0_TX0, DREQ_PIO0_RX0, DREQ_PIO1_TX0 = 0, 4, 8
-DREQ_PIO1_RX0, DREQ_SPI0_TX,  DREQ_SPI0_RX  = 12, 16, 17
-DREQ_SPI1_TX,  DREQ_SPI1_RX,  DREQ_UART0_TX = 18, 19, 20
-DREQ_UART0_RX, DREQ_UART1_TX, DREQ_UART1_RX = 21, 22, 23
-DREQ_PWM_WRAP0                              = 24
-DREQ_I2C0_TX,  DREQ_I2C0_RX,  DREQ_I2C1_TX  = 32, 33, 34
-DREQ_I2C1_RX,  DREQ_ADC                     = 35, 36
+DMA_NORMAL, DMA_TRIGGER_SELF, DMA_ENDLESS                    = 0, 1, 15 # PICO2 only
+DREQ_PIO0_TX0, DREQ_PIO0_RX0, DREQ_PIO1_TX0, DREQ_PIO1_RX0   = 0, 4, 8, 12
+if PICO2:
+  DREQ_SPI0_TX,  DREQ_SPI0_RX,  DREQ_SPI1_TX, DREQ_SPI1_RX   = 24, 25, 26, 27
+  DREQ_UART0_TX, DREQ_UART0_RX, DREQ_UART1_TX, DREQ_UART1_RX = 28, 29, 30, 31
+  DREQ_PWM_WRAP0,DREQ_PWM_WRAP1,DREQ_PWM_WRAP2,DREQ_PWM_WRAP3= 32, 33, 34, 35
+  DREQ_ADC                                                   = 48
+else:  
+  DREQ_SPI0_TX,  DREQ_SPI0_RX,  DREQ_SPI1_TX, DREQ_SPI1_RX   = 16, 17, 18, 19
+  DREQ_UART0_TX, DREQ_UART0_RX, DREQ_UART1_TX, DREQ_UART1_RX = 20, 21, 22, 23
+  DREQ_PWM_WRAP0,DREQ_PWM_WRAP1,DREQ_PWM_WRAP2,DREQ_PWM_WRAP3= 24, 25, 26, 27
+  DREQ_ADC                                                   = 36
 
-DMA_CTRL_TRIG_FIELDS = {
+if PICO2:
+  DMA_CTRL_TRIG_FIELDS = {
+    "AHB_ERROR":    31<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "READ_ERROR":   30<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "WRITE_ERROR":  29<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "BUSY":         26<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "SNIFF_EN":     25<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "BSWAP":        24<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "IRQ_QUIET":    23<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "TREQ_SEL":     17<<BF_POS | 6<<BF_LEN | BFUINT32,
+    "CHAIN_TO":     13<<BF_POS | 4<<BF_LEN | BFUINT32,
+    "RING_SEL":     12<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "RING_SIZE":     8<<BF_POS | 4<<BF_LEN | BFUINT32,
+    "INCR_WRITE_REV":7<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "INCR_WRITE":    6<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "INCR_READ_REV": 5<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "INCR_READ":     4<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "DATA_SIZE":     2<<BF_POS | 2<<BF_LEN | BFUINT32,
+    "HIGH_PRIORITY": 1<<BF_POS | 1<<BF_LEN | BFUINT32,
+    "EN":            0<<BF_POS | 1<<BF_LEN | BFUINT32
+  }
+else:
+  DMA_CTRL_TRIG_FIELDS = {
     "AHB_ERROR":   31<<BF_POS | 1<<BF_LEN | BFUINT32,
     "READ_ERROR":  30<<BF_POS | 1<<BF_LEN | BFUINT32,
     "WRITE_ERROR": 29<<BF_POS | 1<<BF_LEN | BFUINT32,
@@ -63,7 +100,7 @@ DMA_CTRL_TRIG_FIELDS = {
     "DATA_SIZE":    2<<BF_POS | 2<<BF_LEN | BFUINT32,
     "HIGH_PRIORITY":1<<BF_POS | 1<<BF_LEN | BFUINT32,
     "EN":           0<<BF_POS | 1<<BF_LEN | BFUINT32
-}
+  }
 # Channel-specific DMA registers
 DMA_CHAN_REGS = {
     "READ_ADDR_REG":       0x00|UINT32,
@@ -73,7 +110,33 @@ DMA_CHAN_REGS = {
     "CTRL_TRIG":          (0x0c,DMA_CTRL_TRIG_FIELDS)
 }
 # General DMA registers
-DMA_DEVICE_REGS = {
+if PICO2:
+  DMA_DEVICE_REGS = {
+    "INTR":               0x400|UINT32,
+    "INTE0":              0x404|UINT32,
+    "INTF0":              0x408|UINT32,
+    "INTS0":              0x40c|UINT32,
+    "INTE1":              0x414|UINT32,
+    "INTF1":              0x418|UINT32,
+    "INTS1":              0x41c|UINT32,
+    "INTE2":              0x424|UINT32,
+    "INTF2":              0x428|UINT32,
+    "INTS2":              0x42c|UINT32,
+    "INTE3":              0x434|UINT32,
+    "INTF3":              0x438|UINT32,
+    "INTS3":              0x43c|UINT32,
+    "TIMER0":             0x440|UINT32,
+    "TIMER1":             0x444|UINT32,
+    "TIMER2":             0x448|UINT32,
+    "TIMER3":             0x44c|UINT32,
+    "MULTI_CHAN_TRIGGER": 0x450|UINT32,
+    "SNIFF_CTRL":         0x454|UINT32,
+    "SNIFF_DATA":         0x458|UINT32,
+    "FIFO_LEVELS":        0x460|UINT32,
+    "CHAN_ABORT":         0x464|UINT32
+  }
+else:
+  DMA_DEVICE_REGS = {
     "INTR":               0x400|UINT32,
     "INTE0":              0x404|UINT32,
     "INTF0":              0x408|UINT32,
@@ -90,12 +153,11 @@ DMA_DEVICE_REGS = {
     "SNIFF_DATA":         0x438|UINT32,
     "FIFO_LEVELS":        0x440|UINT32,
     "CHAN_ABORT":         0x444|UINT32
-}
+  }
 DMA_CHANS = [struct(DMA_BASE + n*DMA_CHAN_WIDTH, DMA_CHAN_REGS) for n in range(0,DMA_CHAN_COUNT)]
 DMA_DEVICE = struct(DMA_BASE, DMA_DEVICE_REGS)
 
-# GPIO status and control: RP2040 datasheet 2.19.6.1.10
-GPIO_BASE       = 0x40014000
+# GPIO status and control: datasheet RP2040 2.19.6.1, RP2350 9.11.1
 GPIO_CHAN_WIDTH = 0x08
 GPIO_PIN_COUNT  = 30
 GPIO_FUNC_SPI, GPIO_FUNC_UART, GPIO_FUNC_I2C = 1, 2, 3
@@ -126,8 +188,10 @@ GPIO_REGS = {
 }
 GPIO_PINS = [struct(GPIO_BASE + n*GPIO_CHAN_WIDTH, GPIO_REGS) for n in range(0,GPIO_PIN_COUNT)]
 
-# PAD control: RP2040 datasheet 2.19.6.3
+# PAD control: datasheet RP2040 2.19.6.3 RP2350 9.11.3
+PAD_PIN_WIDTH   = 0x04
 PAD_FIELDS = {
+    "ISO":         8<<BF_POS | 1<<BF_LEN | BFUINT32,  # PICO2 only
     "OD":          7<<BF_POS | 1<<BF_LEN | BFUINT32,
     "IE":          6<<BF_POS | 1<<BF_LEN | BFUINT32,
     "DRIVE":       4<<BF_POS | 2<<BF_LEN | BFUINT32,
@@ -142,7 +206,7 @@ PAD_REGS = {
 }
 PAD_PINS =  [struct(PAD_BASE + (n+1)*PAD_PIN_WIDTH, PAD_REGS) for n in range(0,GPIO_PIN_COUNT)]
 
-# ADC: RP2040 datasheet 4.9.6
+# ADC: datasheet RP2040 4.9.6 RP2350 12.4.7
 ADC_CS_FIELDS = {
     "RROBIN":     16<<BF_POS | 5<<BF_LEN | BFUINT32,
     "AINSEL":     12<<BF_POS | 3<<BF_LEN | BFUINT32,
@@ -182,7 +246,9 @@ ADC_DEVICE_REGS = {
 ADC_DEVICE = struct(ADC_BASE, ADC_DEVICE_REGS)
 ADC_FIFO_ADDR = ADC_BASE + 0x0c
 
-# PWM: RP2040 data sheet 4.5.3
+# PWM: datasheet RP2040 4.5.3 RP2350 12.5.3
+PWM_SLICE_WIDTH = 0x14
+PWM_SLICE_COUNT = 12 if PICO2 else 8
 PWM_DIV_FREE_RUNNING, PWM_DIV_B_HIGH, PWM_DIV_B_RISING, PWM_DIV_B_FALLING = 0, 1, 2, 3
 
 PWM_CSR_FIELDS = {
@@ -215,11 +281,11 @@ PWM_SLICE_REGS = {
 }
 # General PWM registers
 PWM_DEVICE_REGS = {
-    "EN_REG":              0xa0|UINT32
+    "EN_REG":              (0xf0 if PICO2 else 0xa0) | UINT32
 }
 PWM_DEVICE = struct(PWM_BASE, PWM_DEVICE_REGS)
 PWM_SLICES = [struct(PWM_BASE + n*PWM_SLICE_WIDTH, PWM_SLICE_REGS) for n in range(0,PWM_SLICE_COUNT)]
-PWM_EN_REG_ADDR = PWM_BASE + 0xa0
+PWM_EN_REG_ADDR = PWM_BASE + (0xf0 if PICO2 else 0xa0)
 
 # Address of lower 32 bits of 1 MHz timer
 TIMER_RAWL_ADDR = TIMER_BASE + 0x28
@@ -228,6 +294,8 @@ TIMER_RAWL_ADDR = TIMER_BASE + 0x28
 def gpio_set_function(gpio, f):
     PAD_PINS[gpio].PAD.OD = 0;
     PAD_PINS[gpio].PAD.IE = 1;
+    if PICO2:
+        PAD_PINS[gpio].PAD.ISO = 0;
     GPIO_PINS[gpio].GPIO_CTRL_REG = f
 
 # Get address of variable (for DMA)
@@ -238,7 +306,7 @@ def addressof(var):
 def array32(size):
     return array.array('I', (0 for _ in range(size)))
 
-# Class for RP2040 DMA
+# Class for RP2040/2350 DMA
 class DMA:
     instance_number = 0
     def __init__(self):
@@ -273,8 +341,10 @@ class DMA:
     def set_write_addr(self, addr, trigger=False):
         self.chan.WRITE_ADDR_REG = addr
         self.set_trigger(trigger)
-    # Set number of transfers        
-    def set_trans_count(self, count, trigger=False):
+    # Set number of transfers (and mode if RP2350)
+    def set_trans_count(self, count, trigger=False, mode=DMA_NORMAL):
+        if PICO2 and mode:
+            count |= mode << 28
         self.chan.TRANS_COUNT_REG = count
         self.set_trigger(trigger)
     # Enable/disable auto-increment of source address
@@ -292,7 +362,7 @@ class DMA:
         self.set_trans_count(counter, True)
     # Return number of transfers that remain        
     def get_trans_count(self):
-        return self.chan.TRANS_COUNT_REG
+        return self.chan.TRANS_COUNT_REG & 0xfffffff
     # Print register values
     def print_regs(self):
         print("READ_ADDR  %08X, "      % self.chan.READ_ADDR_REG, end="")
@@ -300,9 +370,9 @@ class DMA:
         print("TRANS_COUNT_REG %08X, " % self.chan.TRANS_COUNT_REG, end="")
         print("CTRL_TRIG_REG %08X"     % self.chan.CTRL_TRIG_REG)
         
-# Class for RP2040 PWM
+# Class for RP2040/2350 PWM
 class PWM:
-    def __init__(self, gpio, clock=125000000):
+    def __init__(self, gpio, clock=CLOCK_FREQ):
         self.gpio = gpio
         self.clock = clock
         self.slice_num = self.gpio_to_slice_num(gpio)
